@@ -37,9 +37,15 @@ if period_mode == "月度選択":
     start_date = datetime.date(sel_year, sel_month, 1)
     _, last_day = calendar.monthrange(sel_year, sel_month)
     end_date = datetime.date(sel_year, sel_month, last_day)
-    # 未来の場合は昨日まで
+    # 未来の場合は昨日まで（ただし月初1日なら当日）
     if end_date >= today:
-        end_date = today - datetime.timedelta(days=1)
+        if today.day == 1 and today.month == sel_month and today.year == sel_year:
+            end_date = today
+        else:
+            end_date = today - datetime.timedelta(days=1)
+    # end_dateがstart_dateより前にならないよう保護
+    if end_date < start_date:
+        end_date = start_date
     st.sidebar.info(f"📅 {start_date} ～ {end_date}")
 else:
     first_day = today.replace(day=1)
