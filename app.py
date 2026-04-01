@@ -1,4 +1,4 @@
-﻿import streamlit as st
+import streamlit as st
 import pandas as pd
 import requests
 import datetime
@@ -184,6 +184,7 @@ if st.sidebar.button("データ取得"):
                         lambda x: (x['click'] / x['impression'] * 100) if x['impression'] > 0 else 0, axis=1)
                     
                     acc_display = acc_summary[['account_name', 'monthly_budget', 'gross', 'remaining', 'progress_pct', 'impression', 'click', 'ctr']].copy()
+                    acc_display = acc_display.sort_values('remaining', ascending=False)
                     acc_display.columns = ['アカウント名', '① 当月予算', '② 当月消化額', '③ 未消化額', '消化率(%)', '合計IMP', '合計Click', 'CTR(%)']
                     
                     styled_acc = acc_display.style.format({
@@ -201,6 +202,7 @@ if st.sidebar.button("データ取得"):
                     st.markdown("#### 📋 キャンペーン別 詳細")
                     
                     camp_display = merged_df[['account_name', 'campaign_name', 'monthly_budget', 'gross', 'remaining', 'progress_pct', 'impression', 'click']].copy()
+                    camp_display = camp_display.sort_values('remaining', ascending=False)
                     camp_display['ctr'] = camp_display.apply(
                         lambda x: (x['click'] / x['impression'] * 100) if x['impression'] > 0 else 0, axis=1)
                     camp_display.columns = ['アカウント名', 'キャンペーン名', '① 当月予算', '② 当月消化額', '③ 未消化額', '消化率(%)', '合計IMP', '合計Click', 'CTR(%)']
