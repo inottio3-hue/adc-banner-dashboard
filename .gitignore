@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+*.pyo
+.env
+*.xlsx
+*.bat
+requirements.txt.txt
+inspect_excel.py
+extract_json.py
