@@ -44,7 +44,12 @@ if period_mode == "月度選択":
 else:
     first_day = today.replace(day=1)
     start_date = st.sidebar.date_input("開始日", first_day)
-    end_date = st.sidebar.date_input("終了日", today - datetime.timedelta(days=1))
+    # 月初1日に開いた場合は1日、それ以外は前日
+    if today.day == 1:
+        default_end = today
+    else:
+        default_end = today - datetime.timedelta(days=1)
+    end_date = st.sidebar.date_input("終了日", default_end)
 
 # --- データ取得関数 ---
 def get_microad_data(api_key, start, end):
@@ -105,6 +110,95 @@ if st.sidebar.button("データ取得"):
                                 'monthly_budget': monthly_limit
                             })
             master_df = pd.DataFrame(campaigns)
+
+            # ========================================================
+            # 月度選択モード：専用の月次サマリ表示
+            # ========================================================
+            if period_mode == "月度選択":
+                records = []
+                if 'report' in data and 'records' in data['report']:
+                    records = data['report']['records']
+                
+                if not records:
+                    st.warning("指定月のデータがありません。")
+                else:
+                    perf_df = pd.DataFrame(records)
+                    for col in ['net', 'gross', 'impression', 'click']:
+                        if col in perf_df.columns:
+                            perf_df[col] = pd.to_numeric(perf_df[col], errors='coerce').fillna(0)
+                    
+                    # キャンペーン別集計
+                    agg_df = perf_df.groupby('campaign_id')[['gross', 'impression', 'click']].sum().reset_index()
+                    merged_df = pd.merge(agg_df, master_df, on='campaign_id', how='left')
+                    merged_df['remaining'] = merged_df['monthly_budget'] - merged_df['gross']
+                    merged_df['progress_pct'] = merged_df.apply(
+                        lambda x: (x['gross'] / x['monthly_budget'] * 100) if x['monthly_budget'] > 0 else 0, axis=1)
+                    
+                    # --- 全体サマリ ---
+                    st.markdown("---")
+                    st.markdown(f"### 📅 {selected_month} 月次レポート")
+                    
+                    total_budget = merged_df['monthly_budget'].sum()
+                    total_gross = merged_df['gross'].sum()
+                    total_remaining = total_budget - total_gross
+                    
+                    mc1, mc2, mc3 = st.columns(3)
+                    mc1.metric("① 当月予算", f"¥{total_budget:,.0f}")
+                    mc2.metric("② 当月消化額", f"¥{total_gross:,.0f}",
+                               delta=f"消化率 {total_gross/total_budget*100:.1f}%" if total_budget > 0 else "")
+                    mc3.metric("③ 未消化額（消化残額）", f"¥{total_remaining:,.0f}",
+                               delta=f"残 {total_remaining/total_budget*100:.1f}%" if total_budget > 0 else "")
+                    
+                    # --- アカウント別サマリ ---
+                    st.markdown("---")
+                    st.markdown("#### 📋 アカウント別 月次サマリ")
+                    
+                    acc_summary = merged_df.groupby('account_name').agg(
+                        monthly_budget=('monthly_budget', 'sum'),
+                        gross=('gross', 'sum'),
+                        remaining=('remaining', 'sum'),
+                        impression=('impression', 'sum'),
+                        click=('click', 'sum')
+                    ).reset_index()
+                    acc_summary['progress_pct'] = acc_summary.apply(
+                        lambda x: (x['gross'] / x['monthly_budget'] * 100) if x['monthly_budget'] > 0 else 0, axis=1)
+                    acc_summary['ctr'] = acc_summary.apply(
+                        lambda x: (x['click'] / x['impression'] * 100) if x['impression'] > 0 else 0, axis=1)
+                    
+                    acc_display = acc_summary[['account_name', 'monthly_budget', 'gross', 'remaining', 'progress_pct', 'impression', 'click', 'ctr']].copy()
+                    acc_display.columns = ['アカウント名', '① 当月予算', '② 当月消化額', '③ 未消化額', '消化率(%)', '合計IMP', '合計Click', 'CTR(%)']
+                    
+                    styled_acc = acc_display.style.format({
+                        '① 当月予算': '¥{:,.0f}',
+                        '② 当月消化額': '¥{:,.0f}',
+                        '③ 未消化額': '¥{:,.0f}',
+                        '消化率(%)': '{:.1f}%',
+                        '合計IMP': '{:,.0f}',
+                        '合計Click': '{:,.0f}',
+                        'CTR(%)': '{:.2f}%'
+                    })
+                    st.dataframe(styled_acc, use_container_width=True, height=400)
+                    
+                    # --- キャンペーン別詳細 ---
+                    st.markdown("#### 📋 キャンペーン別 詳細")
+                    
+                    camp_display = merged_df[['account_name', 'campaign_name', 'monthly_budget', 'gross', 'remaining', 'progress_pct', 'impression', 'click']].copy()
+                    camp_display['ctr'] = camp_display.apply(
+                        lambda x: (x['click'] / x['impression'] * 100) if x['impression'] > 0 else 0, axis=1)
+                    camp_display.columns = ['アカウント名', 'キャンペーン名', '① 当月予算', '② 当月消化額', '③ 未消化額', '消化率(%)', '合計IMP', '合計Click', 'CTR(%)']
+                    
+                    styled_camp = camp_display.style.format({
+                        '① 当月予算': '¥{:,.0f}',
+                        '② 当月消化額': '¥{:,.0f}',
+                        '③ 未消化額': '¥{:,.0f}',
+                        '消化率(%)': '{:.1f}%',
+                        '合計IMP': '{:,.0f}',
+                        '合計Click': '{:,.0f}',
+                        'CTR(%)': '{:.2f}%'
+                    })
+                    st.dataframe(styled_camp, use_container_width=True, height=600)
+                
+                st.stop()  # 月度選択モードはここで終了（カスタム期間の詳細画面は表示しない）
 
             # 2. 実績データ作成
             records = []
