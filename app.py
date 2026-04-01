@@ -18,11 +18,33 @@ st.sidebar.header("設定 / フィルタ")
 # 1. API Key入力
 api_key = st.sidebar.text_input("MicroAd API Key", type="password")
 
-# 2. 期間選択
+# 2. 期間選択モード
 today = datetime.date.today()
-first_day = today.replace(day=1)
-start_date = st.sidebar.date_input("開始日", first_day)
-end_date = st.sidebar.date_input("終了日", today - datetime.timedelta(days=1))
+period_mode = st.sidebar.radio("期間モード", ["月度選択", "カスタム期間"], horizontal=True)
+
+if period_mode == "月度選択":
+    # 過去12ヶ月分の選択肢を生成
+    month_options = []
+    for i in range(12):
+        d = today.replace(day=1) - datetime.timedelta(days=i * 28)
+        d = d.replace(day=1)
+        month_options.append(d.strftime("%Y年%m月"))
+    # 重複除去して日付順に
+    month_options = list(dict.fromkeys(month_options))
+    selected_month = st.sidebar.selectbox("月度を選択", month_options)
+    sel_year = int(selected_month[:4])
+    sel_month = int(selected_month[5:7])
+    start_date = datetime.date(sel_year, sel_month, 1)
+    _, last_day = calendar.monthrange(sel_year, sel_month)
+    end_date = datetime.date(sel_year, sel_month, last_day)
+    # 未来の場合は昨日まで
+    if end_date >= today:
+        end_date = today - datetime.timedelta(days=1)
+    st.sidebar.info(f"📅 {start_date} ～ {end_date}")
+else:
+    first_day = today.replace(day=1)
+    start_date = st.sidebar.date_input("開始日", first_day)
+    end_date = st.sidebar.date_input("終了日", today - datetime.timedelta(days=1))
 
 # --- データ取得関数 ---
 def get_microad_data(api_key, start, end):
@@ -200,17 +222,19 @@ if st.sidebar.button("データ取得"):
                 st.markdown("---")
                 
                 st.markdown("##### 💰 予算・消化状況（全体）")
-                r1c1, r1c2, r1c3, r1c4, r1c5 = st.columns(5)
+                r1c1, r1c2, r1c3, r1c4, r1c5, r1c6 = st.columns(6)
                 
                 total_budget = table_display_df['当月予算'].sum()
                 total_gross = table_display_df['期間消化額'].sum()
+                total_remaining = total_budget - total_gross
                 
-                r1c1.metric("当月予算合計", f"¥{total_budget:,.0f}")
-                r1c2.metric("合計消化額 (Gross)", f"¥{total_gross:,.0f}")
-                r1c3.metric("昨日の合計消化額", f"¥{table_display_df['昨日消化'].sum():,.0f}", f"{table_display_df['消化前日比'].sum():+,.0f} 円")
-                r1c4.metric("当月の理想進捗率", f"{standard_pacing:.1f}%", f"{end_date.month}/{end_date.day} 時点")
+                r1c1.metric("① 当月予算合計", f"¥{total_budget:,.0f}")
+                r1c2.metric("② 当月消化額 (Gross)", f"¥{total_gross:,.0f}")
+                r1c3.metric("③ 未消化額（消化残額）", f"¥{total_remaining:,.0f}", delta=f"{total_remaining/total_budget*100:.1f}% 残" if total_budget > 0 else "")
+                r1c4.metric("昨日の合計消化額", f"¥{table_display_df['昨日消化'].sum():,.0f}", f"{table_display_df['消化前日比'].sum():+,.0f} 円")
+                r1c5.metric("当月の理想進捗率", f"{standard_pacing:.1f}%", f"{end_date.month}/{end_date.day} 時点")
                 avg_prog = table_display_df[table_display_df['当月予算']>0]['進捗率(%)'].mean()
-                r1c5.metric("平均実績進捗率", f"{avg_prog:.1f}%", delta=f"{avg_prog - standard_pacing:.1f} pt")
+                r1c6.metric("平均実績進捗率", f"{avg_prog:.1f}%", delta=f"{avg_prog - standard_pacing:.1f} pt")
 
                 st.markdown("##### 🚨 予測・アラート")
                 period_days_so_far = (end_date - start_date).days + 1
