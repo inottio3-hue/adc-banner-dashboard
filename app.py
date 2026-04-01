@@ -1,4 +1,4 @@
-import streamlit as st
+﻿import streamlit as st
 import pandas as pd
 import requests
 import datetime
@@ -20,9 +20,9 @@ api_key = st.sidebar.text_input("MicroAd API Key", type="password")
 
 # 2. 期間選択モード
 today = datetime.date.today()
-period_mode = st.sidebar.radio("期間モード", ["月度選択", "カスタム期間"], horizontal=True)
+period_mode = st.sidebar.radio("期間モード", ["月度配信結果報告", "運用調整用"], horizontal=True)
 
-if period_mode == "月度選択":
+if period_mode == "月度配信結果報告":
     # 過去12ヶ月分の選択肢を生成
     month_options = []
     for i in range(12):
@@ -130,9 +130,9 @@ if st.sidebar.button("データ取得"):
             master_df = pd.DataFrame(campaigns)
 
             # ========================================================
-            # 月度選択モード：専用の月次サマリ表示
+            # 月度配信結果報告モード：専用の月次サマリ表示
             # ========================================================
-            if period_mode == "月度選択":
+            if period_mode == "月度配信結果報告":
                 records = []
                 if 'report' in data and 'records' in data['report']:
                     records = data['report']['records']
@@ -216,7 +216,7 @@ if st.sidebar.button("データ取得"):
                     })
                     st.dataframe(styled_camp, use_container_width=True, height=600)
                 
-                st.stop()  # 月度選択モードはここで終了（カスタム期間の詳細画面は表示しない）
+                st.stop()  # 月度配信結果報告モードはここで終了（運用調整用の詳細画面は表示しない）
 
             # 2. 実績データ作成
             records = []
