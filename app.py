@@ -44,12 +44,24 @@ if period_mode == "月度選択":
 else:
     first_day = today.replace(day=1)
     start_date = st.sidebar.date_input("開始日", first_day)
-    # 月初1日に開いた場合は1日、それ以外は前日
+    # 終了日は開始日と同じ月内に制限
+    _, last_day_of_start_month = calendar.monthrange(start_date.year, start_date.month)
+    max_end = datetime.date(start_date.year, start_date.month, last_day_of_start_month)
+    min_end = start_date
+    # デフォルト終了日：月初1日に開いた場合は1日、それ以外は前日
     if today.day == 1:
         default_end = today
     else:
         default_end = today - datetime.timedelta(days=1)
-    end_date = st.sidebar.date_input("終了日", default_end)
+    # デフォルトが開始月の範囲外なら月末に
+    if default_end > max_end:
+        default_end = max_end
+    if default_end < min_end:
+        default_end = min_end
+    end_date = st.sidebar.date_input("終了日", default_end, min_value=min_end, max_value=max_end)
+    if start_date.month != end_date.month or start_date.year != end_date.year:
+        st.sidebar.error("⚠ 月を跨ぐ期間は指定できません。")
+        st.stop()
 
 # --- データ取得関数 ---
 def get_microad_data(api_key, start, end):
